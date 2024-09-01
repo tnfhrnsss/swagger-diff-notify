@@ -11,28 +11,8 @@ def send(message):
     try:
         response = client.chat_postMessage(
             channel=slack_channel_id,
-            text= "coverage alarm message",
-            blocks=[
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text":   " 테스트 코드 작성 ✍ 해주세요. ( Coverage 60% 이상 )"
-                    }
-                },
-                {
-                    "type": "divider"
-                },
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": "👀 대상 목록입니다.\n " + message
-                        }
-                    ]
-                }
-            ]
+            text= "api change log",
+            blocks = message
         )
         print(response)
     except Exception as e:

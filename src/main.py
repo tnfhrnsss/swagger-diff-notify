@@ -47,15 +47,21 @@ def compareto(newjson):
 
         paths_values = [item.split("root['paths']")[1].strip("[]'") for item in diff['dictionary_item_added'] if "root['paths']" in item]
        # print(paths_values)
+
         for aaa in paths_values:
             swagger_data = newjson.get('paths').get(aaa)
             #print(swagger_data)
+            #print(aaa)
 
             slack_message_blocks = []
+            slack_message_blocks.append(create_header())
+            slack_message_blocks.append(create_divider())
+            slack_message_blocks.append(creamte_path_message(aaa))
             for endpoint, methods in swagger_data.items():
-                slack_message_blocks.extend(create_slack_message(endpoint, methods))
+                slack_message_blocks.append(create_header_endpoint(endpoint))
+                slack_message_blocks.append(create_slack_message(methods, newjson))
 
-            print(slack_message_blocks)
+            #print(slack_message_blocks)
             #send(slack_message_blocks)
 
     #message = format_diff_to_slack(diff)
@@ -63,65 +69,119 @@ def compareto(newjson):
         #send(message)
         #success(newjson)
 
-
-def create_slack_message(endpoint, methods):
-    blocks = []
-
-    # 엔드포인트 헤더
-    blocks.append({
+def create_header():
+    return {
         "type": "section",
         "text": {
             "type": "mrkdwn",
-            "text": f"*Endpoint:* `{endpoint}`"
+            "text": ":mag: *Api Change*"
         }
-    })
+    }
+
+
+def creamte_path_message(path):
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*API:* `{path}`"
+        }
+    }
+
+
+
+def create_header_endpoint(endpoint):
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": f"*Method:* `{endpoint}`"
+        }
+    }
+
+
+def create_divider():
+    return {
+        "type": "divider"
+    }
+
+
+def check_required(is_required):
+    return "(Required)" if is_required else ""
+
+
+
+def create_slack_message(methods, newjson):
+    table = ""
+
 
     # 각 메소드에 대한 테이블 생성
     for method, details in methods.items():
-        print(method)
-        print(details)
         if method == 'tags' or method == 'operationId':
             continue
 
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"*Method:* `{method.upper()}`"
-            }
-        })
+        if method == 'responses':
+            continue
 
-        table = "*Details:*\n"
-        table += "| Key | Value |\n"
-        table += "| --- | ----- |\n"
+        print(method)
+        print(details)
+
      #   table += f"| *OperationId* | `{details['operationId']}` |\n"
      #   table += f"| *Tags* | `{', '.join(details['tags'])}` |\n"
 
         if method == 'parameters':
-            table = ""
-            param_list = ', '.join([f"`{param['name']}` 필수여부: ({param['required']})" for param in details])
-            table += f"| *Parameters* | {param_list} |\n"
-            print(table)
+            header_params = []
+            path_params = []
 
-        #if method == 'requestBody':
-            #request_body = details.get('requestBody', {})
-            #if request_body:
-                #table += "| *Request Body* | JSON |\n"
+            for param in details:
+                param_string = f"• {param['name']} {check_required(param['required'])} \n"
+                if param['in'] == "header":
+                    header_params.append(param_string)
+                elif param['in'] == "path":
+                    path_params.append(param_string)
+
+            if header_params:
+                header_param_list = '\n '.join(header_params)
+                table += f"* Header Parameters* \n {header_param_list} \n"
+
+            if path_params:
+                path_param_list = '\n '.join(path_params)
+                table += f"* Path Parameters* \n {path_param_list} \n"
+
+
+        scheme_message = ''
+        if method == 'requestBody':
+            ref_path = details['content']['application/json']['schema']['$ref']
+
+            path = ref_path.lstrip('#').split('/')
+            def get_value_from_path(data, path):
+                for key in path:
+                    if key == '':
+                        continue
+                    data = data[key]
+                return data
+
+            sms_push_template_cdo = get_value_from_path(newjson, path)
+
+            print(json.dumps(sms_push_template_cdo, indent=2))
+            scheme_message = format_schema(sms_push_template_cdo)
+            table += scheme_message
 
         #if method == 'responses':
             #responses = details.get('responses', {})
             #response_codes = ', '.join(responses.keys())
             #table += f"| *Responses* | {response_codes} |\n"
 
-        blocks.append({
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": table
-            }
-        })
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+         #   "text": table,
+            "text": f"``` {table}```"
+        }
+    }
 
-    return blocks
+
 
 
 def format_diff_to_slack(diff):
@@ -146,6 +206,27 @@ def format_diff_to_slack(diff):
         message += "\n*변경된 항목:*\n"
         for key, value in changed.items():
             message += f"- {key}: {value['old_value']} -> {value['new_value']}\n"
+
+    return message
+
+
+def format_schema(data):
+    required_fields = ', '.join(data.get("required", []))
+
+    properties = []
+    for key, value in data.get("properties", {}).items():
+        prop_type = value.get("type", "")
+        min_length = value.get("minLength", "")
+        max_length = value.get("maxLength", "")
+        properties.append(f"- {key} (type: {prop_type}, minLength: {min_length}, maxLength: {max_length})")
+
+    properties_str = "\n".join(properties)
+
+    message = (
+        "Request Body\n"
+        f"Required Fields: {required_fields}\n"
+        f"Properties:\n{properties_str}"
+    )
 
     return message
 

@@ -51,32 +51,17 @@ def compareto(newjson):
         for aaa in paths_values:
             swagger_data = newjson.get('paths').get(aaa)
             #print(swagger_data)
-            #print(aaa)
 
             slack_message_blocks = []
-            slack_message_blocks.append(create_header())
             slack_message_blocks.append(create_divider())
             slack_message_blocks.append(creamte_path_message(aaa))
             for endpoint, methods in swagger_data.items():
+                print()
                 slack_message_blocks.append(create_header_endpoint(endpoint))
                 slack_message_blocks.append(create_slack_message(methods, newjson))
 
             #print(slack_message_blocks)
-            #send(slack_message_blocks)
-
-    #message = format_diff_to_slack(diff)
-
-        #send(message)
-        #success(newjson)
-
-def create_header():
-    return {
-        "type": "section",
-        "text": {
-            "type": "mrkdwn",
-            "text": ":mag: *Api Change*"
-        }
-    }
+            send(slack_message_blocks)
 
 
 def creamte_path_message(path):
@@ -113,11 +98,11 @@ def check_required(is_required):
 
 def create_slack_message(methods, newjson):
     table = ""
-
+    link_url = ""
 
     # 각 메소드에 대한 테이블 생성
     for method, details in methods.items():
-        if method == 'tags' or method == 'operationId':
+        if method == 'operationId':
             continue
 
         if method == 'responses':
@@ -128,25 +113,28 @@ def create_slack_message(methods, newjson):
 
      #   table += f"| *OperationId* | `{details['operationId']}` |\n"
      #   table += f"| *Tags* | `{', '.join(details['tags'])}` |\n"
+        if method == 'tags':
+            link_url = api_url + "swagger-ui/index.html#/" + details[0]
+
 
         if method == 'parameters':
             header_params = []
             path_params = []
 
             for param in details:
-                param_string = f"• {param['name']} {check_required(param['required'])} \n"
+                param_string = f"* {param['name']} {check_required(param['required'])}"
                 if param['in'] == "header":
                     header_params.append(param_string)
                 elif param['in'] == "path":
                     path_params.append(param_string)
 
             if header_params:
-                header_param_list = '\n '.join(header_params)
-                table += f"* Header Parameters* \n {header_param_list} \n"
+                header_param_list = '\n'.join(header_params)
+                table += f"• Header Parameters \n ```{header_param_list}``` \n"
 
             if path_params:
-                path_param_list = '\n '.join(path_params)
-                table += f"* Path Parameters* \n {path_param_list} \n"
+                path_param_list = '\n'.join(path_params)
+                table += f"• Path Parameters \n ```{path_param_list}``` \n"
 
 
         scheme_message = ''
@@ -162,52 +150,33 @@ def create_slack_message(methods, newjson):
                 return data
 
             sms_push_template_cdo = get_value_from_path(newjson, path)
-
-            print(json.dumps(sms_push_template_cdo, indent=2))
             scheme_message = format_schema(sms_push_template_cdo)
             table += scheme_message
 
-        #if method == 'responses':
-            #responses = details.get('responses', {})
-            #response_codes = ', '.join(responses.keys())
-            #table += f"| *Responses* | {response_codes} |\n"
+        if method == 'responses':
+            ref_path = details['content']['application/json']['schema']['$ref']
+            path = ref_path.lstrip('#').split('/')
+            def get_value_from_path(data, path):
+                for key in path:
+                    if key == '':
+                        continue
+                    data = data[key]
+                return data
+
+            sms_push_template_cdo = get_value_from_path(newjson, path)
+            scheme_message = format_schema(sms_push_template_cdo)
+            table += scheme_message
+
 
     return {
         "type": "section",
         "text": {
             "type": "mrkdwn",
-         #   "text": table,
-            "text": f"``` {table}```"
+            "text": table
         }
     }
 
 
-
-
-def format_diff_to_slack(diff):
-    added = diff.get('dictionary_item_added', [])
-    removed = diff.get('dictionary_item_removed', [])
-    changed = diff.get('values_changed', {})
-
-    # 테이블 헤더
-    message = "*API 변경 사항 감지됨:*\n\n"
-
-    if added:
-        message += "*추가된 항목:*\n"
-        for item in added:
-            message += f"- {item}\n"
-
-    if removed:
-        message += "\n*제거된 항목:*\n"
-        for item in removed:
-            message += f"- {item}\n"
-
-    if changed:
-        message += "\n*변경된 항목:*\n"
-        for key, value in changed.items():
-            message += f"- {key}: {value['old_value']} -> {value['new_value']}\n"
-
-    return message
 
 
 def format_schema(data):
@@ -223,9 +192,9 @@ def format_schema(data):
     properties_str = "\n".join(properties)
 
     message = (
-        "Request Body\n"
-        f"Required Fields: {required_fields}\n"
-        f"Properties:\n{properties_str}"
+        "• Request Body\n"
+        f"```Required Fields: {required_fields}\n"
+        f"Properties:\n{properties_str}```"
     )
 
     return message

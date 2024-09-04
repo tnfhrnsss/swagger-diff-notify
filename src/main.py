@@ -111,8 +111,6 @@ def create_slack_message(methods, newjson):
         print(method)
         print(details)
 
-     #   table += f"| *OperationId* | `{details['operationId']}` |\n"
-     #   table += f"| *Tags* | `{', '.join(details['tags'])}` |\n"
         if method == 'tags':
             link_url = api_url + "swagger-ui/index.html#/" + details[0]
 
@@ -154,7 +152,7 @@ def create_slack_message(methods, newjson):
             table += scheme_message
 
         if method == 'responses':
-            ref_path = details['content']['application/json']['schema']['$ref']
+            ref_path = details['200']['content']['*/*']['schema']['$ref']
             path = ref_path.lstrip('#').split('/')
             def get_value_from_path(data, path):
                 for key in path:
@@ -181,7 +179,7 @@ def create_slack_message(methods, newjson):
 
 def format_schema(data):
     required_fields = ', '.join(data.get("required", []))
-
+    title = "Request Body"
     properties = []
     for key, value in data.get("properties", {}).items():
         prop_type = value.get("type", "")
@@ -192,7 +190,7 @@ def format_schema(data):
     properties_str = "\n".join(properties)
 
     message = (
-        "• Request Body\n"
+        f"• {title}\n"
         f"```Required Fields: {required_fields}\n"
         f"Properties:\n{properties_str}```"
     )

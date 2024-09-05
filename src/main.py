@@ -7,8 +7,11 @@ from deepdiff import DeepDiff
 
 from slack_api import send
 
+from datetime_util import get_current_datetime
+
 print(sys.argv[1])
 api_url = sys.argv[1]
+current_time = get_current_datetime()
 
 
 def main():
@@ -28,40 +31,75 @@ def main():
             print("occur exception.!!", e)
 
 
+
 def compareto(newjson):
-    # 이전 및 새로운 Swagger 파일 로드
     with open('../output/lastest_snapshot.json') as file:
         swagger_old = json.load(file)
 
-
-    # Swagger 파일 비교
     diff = DeepDiff(swagger_old, newjson, ignore_order=True)
 
-    # 변경 사항이 있는 경우 슬랙으로 알림 전송
     if diff:
-        #print(diff)
+        save_diff(diff.to_json())
 
         added = diff.get('dictionary_item_added', [])
-        #print(added)
-        added_items = [item for item in diff['dictionary_item_added'] if "root['paths']" in item]
+        if added:
+            item_added(added, newjson)
 
-        paths_values = [item.split("root['paths']")[1].strip("[]'") for item in diff['dictionary_item_added'] if "root['paths']" in item]
-       # print(paths_values)
+        changed = diff.get('values_changed')
+        if  changed:
+            chmsg = item_changed(changed, newjson)
+            print('$$$$')
+            print(chmsg)
 
-        for aaa in paths_values:
-            swagger_data = newjson.get('paths').get(aaa)
-            #print(swagger_data)
 
-            slack_message_blocks = []
-            slack_message_blocks.append(create_divider())
-            slack_message_blocks.append(creamte_path_message(aaa))
-            for endpoint, methods in swagger_data.items():
-                print()
-                slack_message_blocks.append(create_header_endpoint(endpoint))
-                slack_message_blocks.append(create_slack_message(methods, newjson))
 
-            #print(slack_message_blocks)
-            send(slack_message_blocks)
+
+
+def item_added(added, newjson):
+    paths_values = [item.split("root['paths']")[1].strip("[]'") for item in added if "root['paths']" in item]
+    # print(paths_values)
+
+    for aaa in paths_values:
+        swagger_data = newjson.get('paths').get(aaa)
+        #print(swagger_data)
+
+        slack_message_blocks = []
+        slack_message_blocks.append(create_divider())
+        slack_message_blocks.append(creamte_path_message(aaa))
+        for endpoint, methods in swagger_data.items():
+            slack_message_blocks.append(create_header_endpoint(endpoint))
+            slack_message_blocks.append(create_slack_message(methods, newjson))
+
+        #print(slack_message_blocks)
+        #send(slack_message_blocks)
+
+
+
+def item_changed(changed, newjson):
+    print(changed)
+    messages = []
+
+    for key, changes in changed.items():
+        new_value = changes.get('new_value')
+        old_value = changes.get('old_value')
+
+        message = f"\n변경된 경로: {key}"
+
+        # 변경된 내용을 추가
+        if isinstance(new_value, dict) and isinstance(old_value, dict):
+            # 딕셔너리 내부가 변경된 경우 (properties와 같이 중첩된 경우)
+            for sub_key in new_value.keys() | old_value.keys():
+                nv = new_value.get(sub_key)
+                ov = old_value.get(sub_key)
+                if nv != ov:
+                    message += f"\n  - {sub_key} 변경 전: {ov}, 변경 후: {nv}"
+        else:
+            # 일반 값이 변경된 경우
+            message += f"\n  - 변경 전: {old_value}, 변경 후: {new_value}"
+
+        messages.append(message)
+
+    return "\n".join(messages)
 
 
 def creamte_path_message(path):
@@ -118,6 +156,7 @@ def create_slack_message(methods, newjson):
         if method == 'parameters':
             header_params = []
             path_params = []
+            query_params = []
 
             for param in details:
                 param_string = f"* {param['name']} {check_required(param['required'])}"
@@ -125,6 +164,8 @@ def create_slack_message(methods, newjson):
                     header_params.append(param_string)
                 elif param['in'] == "path":
                     path_params.append(param_string)
+                elif param['in'] == "query":
+                    query_params.append(param_string)
 
             if header_params:
                 header_param_list = '\n'.join(header_params)
@@ -133,6 +174,10 @@ def create_slack_message(methods, newjson):
             if path_params:
                 path_param_list = '\n'.join(path_params)
                 table += f"• Path Parameters \n ```{path_param_list}``` \n"
+
+            if query_params:
+                query_param_list = '\n'.join(query_params)
+                table += f"• Query Parameters \n ```{query_param_list}``` \n"
 
 
         scheme_message = ''
@@ -162,8 +207,10 @@ def create_slack_message(methods, newjson):
                 return data
 
             sms_push_template_cdo = get_value_from_path(newjson, path)
-            scheme_message = format_schema(sms_push_template_cdo)
-            table += scheme_message
+            scheme_message = response_format_schema(sms_push_template_cdo)
+            print('-------')
+            print(scheme_message)
+            #table += scheme_message
 
 
     return {
@@ -179,7 +226,7 @@ def create_slack_message(methods, newjson):
 
 def format_schema(data):
     required_fields = ', '.join(data.get("required", []))
-    title = "Request Body"
+
     properties = []
     for key, value in data.get("properties", {}).items():
         prop_type = value.get("type", "")
@@ -190,12 +237,35 @@ def format_schema(data):
     properties_str = "\n".join(properties)
 
     message = (
-        f"• {title}\n"
+        "• Request Body\n"
         f"```Required Fields: {required_fields}\n"
         f"Properties:\n{properties_str}```"
     )
 
     return message
+
+
+def response_format_schema(data):
+    properties = []
+    for key, value in data.get("properties", {}).items():
+        prop_type = value.get("type", "")
+        min_length = value.get("minLength", "")
+        max_length = value.get("maxLength", "")
+        properties.append(f"- {key} (type: {prop_type}, minLength: {min_length}, maxLength: {max_length})")
+
+    properties_str = "\n".join(properties)
+
+    message = (
+        "• Response Body\n"
+        f"```Properties:\n{properties_str}```"
+    )
+
+    return message
+
+
+def save_diff(diff):
+    with open(f'../output/{current_time}_diff_result.json', 'w') as file:
+        json.dump(diff, file, indent=4)
 
 
 def success(newjson):

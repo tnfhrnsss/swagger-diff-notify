@@ -38,19 +38,21 @@ def compareto(newjson):
 
     diff = DeepDiff(swagger_old, newjson, ignore_order=True)
 
+    slack_message_blocks = []
     if diff:
         save_diff(diff.to_json())
 
         added = diff.get('dictionary_item_added', [])
         if added:
-            item_added(added, newjson)
+            slack_message_blocks = item_added(added, newjson)
 
         changed = diff.get('values_changed')
-        if  changed:
-            chmsg = item_changed(changed, newjson)
-            print('$$$$')
-            print(chmsg)
+        if changed:
+            print(changed)
+            #slack_message_blocks.append(item_changed(changed))
 
+        send(slack_message_blocks)
+        success(newjson)
 
 
 
@@ -59,11 +61,12 @@ def item_added(added, newjson):
     paths_values = [item.split("root['paths']")[1].strip("[]'") for item in added if "root['paths']" in item]
     # print(paths_values)
 
+    slack_message_blocks = []
     for aaa in paths_values:
         swagger_data = newjson.get('paths').get(aaa)
         #print(swagger_data)
 
-        slack_message_blocks = []
+
         slack_message_blocks.append(create_divider())
         slack_message_blocks.append(creamte_path_message(aaa))
         for endpoint, methods in swagger_data.items():
@@ -71,12 +74,11 @@ def item_added(added, newjson):
             slack_message_blocks.append(create_slack_message(methods, newjson))
 
         #print(slack_message_blocks)
-        #send(slack_message_blocks)
+
+    return slack_message_blocks
 
 
-
-def item_changed(changed, newjson):
-    print(changed)
+def item_changed(changed):
     messages = []
 
     for key, changes in changed.items():
@@ -85,16 +87,13 @@ def item_changed(changed, newjson):
 
         message = f"\n변경된 경로: {key}"
 
-        # 변경된 내용을 추가
         if isinstance(new_value, dict) and isinstance(old_value, dict):
-            # 딕셔너리 내부가 변경된 경우 (properties와 같이 중첩된 경우)
             for sub_key in new_value.keys() | old_value.keys():
                 nv = new_value.get(sub_key)
                 ov = old_value.get(sub_key)
                 if nv != ov:
                     message += f"\n  - {sub_key} 변경 전: {ov}, 변경 후: {nv}"
         else:
-            # 일반 값이 변경된 경우
             message += f"\n  - 변경 전: {old_value}, 변경 후: {new_value}"
 
         messages.append(message)
@@ -138,12 +137,8 @@ def create_slack_message(methods, newjson):
     table = ""
     link_url = ""
 
-    # 각 메소드에 대한 테이블 생성
     for method, details in methods.items():
         if method == 'operationId':
-            continue
-
-        if method == 'responses':
             continue
 
         print(method)
@@ -185,32 +180,22 @@ def create_slack_message(methods, newjson):
             ref_path = details['content']['application/json']['schema']['$ref']
 
             path = ref_path.lstrip('#').split('/')
-            def get_value_from_path(data, path):
-                for key in path:
-                    if key == '':
-                        continue
-                    data = data[key]
-                return data
-
             sms_push_template_cdo = get_value_from_path(newjson, path)
             scheme_message = format_schema(sms_push_template_cdo)
             table += scheme_message
 
         if method == 'responses':
-            ref_path = details['200']['content']['*/*']['schema']['$ref']
-            path = ref_path.lstrip('#').split('/')
-            def get_value_from_path(data, path):
-                for key in path:
-                    if key == '':
-                        continue
-                    data = data[key]
-                return data
+            try:
+                ref_path = details['200']['content']['*/*']['schema']['$ref']
+                path = ref_path.lstrip('#').split('/')
 
-            sms_push_template_cdo = get_value_from_path(newjson, path)
-            scheme_message = response_format_schema(sms_push_template_cdo)
-            print('-------')
-            print(scheme_message)
-            #table += scheme_message
+
+                sms_push_template_cdo = get_value_from_path(newjson, path)
+                scheme_message = response_format_schema(sms_push_template_cdo)
+                table += scheme_message
+            except KeyError as e:
+                print(e)
+                #return None
 
 
     return {
@@ -222,6 +207,12 @@ def create_slack_message(methods, newjson):
     }
 
 
+def get_value_from_path(data, path):
+    for key in path:
+        if key == '':
+            continue
+        data = data[key]
+    return data
 
 
 def format_schema(data):
@@ -249,9 +240,12 @@ def response_format_schema(data):
     properties = []
     for key, value in data.get("properties", {}).items():
         prop_type = value.get("type", "")
-        min_length = value.get("minLength", "")
-        max_length = value.get("maxLength", "")
-        properties.append(f"- {key} (type: {prop_type}, minLength: {min_length}, maxLength: {max_length})")
+        enums = value.get("enum", "")
+        message = f"- {key} (type: {prop_type}"
+        if enums:
+            message += f", enum: {enums}"
+        message += ")"
+        properties.append(message)
 
     properties_str = "\n".join(properties)
 

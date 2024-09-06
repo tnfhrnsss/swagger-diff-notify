@@ -1,5 +1,5 @@
 import json
-
+import os
 
 class Config:
     _instance = None
@@ -11,7 +11,9 @@ class Config:
         return cls._instance
 
     def _load_config(self):
-        with open('../config/env.json') as f:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        env_path = os.path.join(base_dir, '../../config', 'env.json')
+        with open(env_path) as f:
             self.config = json.load(f)
 
     def get(self, key, default=None):

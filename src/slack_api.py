@@ -1,5 +1,5 @@
 from slack_sdk import WebClient
-from config_loader import config
+from config.config_loader import config
 
 
 def send(message):

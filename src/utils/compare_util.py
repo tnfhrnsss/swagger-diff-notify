@@ -5,7 +5,7 @@ from deepdiff import DeepDiff
 
 def compareto(newjson):
     # 이전 및 새로운 Swagger 파일 로드
-    with open('../output/lastest_snapshot.json') as file:
+    with open('../../output/lastest_snapshot.json') as file:
         swagger_old = json.load(file)
 
 
@@ -18,7 +18,3 @@ def compareto(newjson):
         #slack_webhook_url = 'https://hooks.slack.com/services/your/webhook/url'
         #message = f"Swagger API 변경사항 감지됨: {diff}"
         #requests.post(slack_webhook_url, json={"text": message})
-
-
-if __name__ == "__main__":
-    compareto(newjson)

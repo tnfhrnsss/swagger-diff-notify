@@ -26,7 +26,7 @@ def compareto(newjson):
 
         removed = diff.get('dictionary_item_removed')
         if removed:
-            print(removed)
+            diff_messages.append(item_removed(removed))
 
         iterable_added = diff.get('iterable_item_added')
         if iterable_added:
@@ -77,6 +77,28 @@ def item_changed(values_changed):
 
     return "\n\n".join(messages)
 
+
+def item_removed(removed):
+    message = []
+    pattern = r"root\['paths'\]\['([^']+)'\]\['([^']+)'\]"
+
+    matches = re.findall(pattern, removed)
+
+    for match in matches:
+        path, method = match
+        print(f"Path: {path}, Method: {method}")
+
+    message.append(templates.welcome_block())
+#            , \"dictionary_item_removed\": [\"root['paths']['/applications/settings']['put']\",
+#\"root['components']['schemas']['ApplicationSettingUdo']\"],
+    for aaa in paths_values:
+#        message.append(templates.divider_block())
+        #swagger_data = newjson.get('paths').get(aaa)
+
+        message.append(templates.api_path_block(aaa))
+        for endpoint, methods in aaa.items():
+            message.append(templates.api_method_block(endpoint))
+    return message
 
 
 def check_required(is_required):

@@ -1,6 +1,7 @@
 from slack import templates
 from deepdiff import DeepDiff
 from utils import file_util
+import re
 
 def compareto(newjson):
     swagger_old = file_util.find_latest_snapshot()
@@ -43,10 +44,10 @@ def item_added(added, newjson):
     message = []
     paths_values = [item.split("root['paths']")[1].strip("[]'") for item in added if "root['paths']" in item]
     message.append(templates.welcome_block())
-    for aaa in paths_values:
-        swagger_data = newjson.get('paths').get(aaa)
+    for value in paths_values:
+        swagger_data = newjson.get('paths').get(value)
         message.append(templates.divider_block())
-        message.append(templates.api_path_block(aaa))
+        message.append(templates.api_path_block(value))
         for endpoint, methods in swagger_data.items():
             message.append(templates.api_method_block(endpoint))
             message.append(create_slack_message(methods, newjson))
@@ -80,24 +81,20 @@ def item_changed(values_changed):
 
 def item_removed(removed):
     message = []
-    pattern = r"root\['paths'\]\['([^']+)'\]\['([^']+)'\]"
+    example_list = list(removed)
 
-    matches = re.findall(pattern, removed)
+    pattern = r"\['(.+?)'\]\['(.+?)'\]"
+    match = re.search(pattern, example_list[0])
 
-    for match in matches:
-        path, method = match
-        print(f"Path: {path}, Method: {method}")
+    if match:
+        path_key = match.group(1)
+        method_key = match.group(2)
+        print(path_key)  # '/applications/settings'
+        print(method_key)  # 'put'
 
-    message.append(templates.welcome_block())
-#            , \"dictionary_item_removed\": [\"root['paths']['/applications/settings']['put']\",
-#\"root['components']['schemas']['ApplicationSettingUdo']\"],
-    for aaa in paths_values:
-#        message.append(templates.divider_block())
-        #swagger_data = newjson.get('paths').get(aaa)
+    print(type(removed))  # '/applications/settings'
+    #print(method_key)  # 'put'
 
-        message.append(templates.api_path_block(aaa))
-        for endpoint, methods in aaa.items():
-            message.append(templates.api_method_block(endpoint))
     return message
 
 

@@ -18,12 +18,12 @@ def main():
             swagger_url = api_url + '/v3/api-docs'
             response = requests.get(swagger_url)
             swagger_json = response.json()
-            diff_messages = compareto(swagger_json)
+            diff_messages = compareto(api_url, swagger_json)
 
             if len(diff_messages) > 0:
                 print(diff_messages)
                 message_api.send(diff_messages)
-                file_util.save_snapshot(swagger_json)
+                file_util.save_snapshot(api_url, swagger_json)
         except http.client.IncompleteRead as e:
             print("IncompleteRead error occurred exception.!!", e)
 

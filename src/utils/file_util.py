@@ -10,12 +10,20 @@ def save_diff(diff):
         json.dump(diff, file, indent=4)
 
 
-def save_snapshot(data):
-    with open('../output/lastest_snapshot.json', 'w') as file:
+def save_snapshot(prefix, data):
+    with open('../output/{}_lastest_snapshot.json'.format(get_prefix(prefix)), 'w') as file:
         json.dump(data, file, indent=4)
 
 
-def find_latest_snapshot():
-    with open('../output/lastest_snapshot.json') as file:
-        swagger_old = json.load(file)
-    return swagger_old
+def find_latest_snapshot(prefix):
+    try:
+        with open('../output/{}_lastest_snapshot.json'.format(get_prefix(prefix))) as file:
+            swagger_old = json.load(file)
+        return swagger_old
+    except FileNotFoundError as e:
+        print("can't find snapshop file. {}".format(e))
+        return json.dumps({})
+
+
+def get_prefix(api_url):
+    return api_url.split("://")[1]

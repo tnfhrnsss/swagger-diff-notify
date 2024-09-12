@@ -3,8 +3,8 @@ from deepdiff import DeepDiff
 from utils import file_util
 import re
 
-def compareto(newjson):
-    swagger_old = file_util.find_latest_snapshot()
+def compareto(api_url, newjson):
+    swagger_old = file_util.find_latest_snapshot(api_url)
     diff = DeepDiff(swagger_old, newjson, ignore_order=True)
 
     diff_messages = []
@@ -89,10 +89,10 @@ def item_removed(removed):
     if match:
         path_key = match.group(1)
         method_key = match.group(2)
-        print(path_key)  # '/applications/settings'
-        print(method_key)  # 'put'
+        #print(path_key)  # '/applications/settings'
+        #print(method_key)  # 'put'
 
-    print(type(removed))  # '/applications/settings'
+    #print(type(removed))  # '/applications/settings'  <class 'deepdiff.model.PrettyOrderedSet'
     #print(method_key)  # 'put'
 
     return message

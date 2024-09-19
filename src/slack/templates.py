@@ -31,6 +31,16 @@ def change_title_block():
     }
 
 
+def remove_title_block():
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":no_good::skin-tone-3: *What's removed?*"
+        }
+    }
+
+
 def markdown_block(messages):
     return {
         "type": "section",

@@ -2,6 +2,7 @@ from slack import templates
 from deepdiff import DeepDiff
 from utils import file_util
 import re
+from constants import PATHS_CONSTANTS
 
 def compareto(api_url, newjson):
     swagger_old = file_util.find_latest_snapshot(api_url)
@@ -27,7 +28,14 @@ def compareto(api_url, newjson):
 
         removed = diff.get('dictionary_item_removed')
         if removed:
-            diff_messages.append(item_removed(removed))
+            removed_messages = item_removed(removed)
+            if removed_messages:
+                if len(diff_messages) > 0 :
+                    diff_messages = templates.divider_block()
+
+                diff_messages.append(templates.remove_title_block())
+                diff_messages.append(templates.markdown_block(removed_messages))
+
 
         iterable_added = diff.get('iterable_item_added')
         if iterable_added:
@@ -80,22 +88,21 @@ def item_changed(values_changed):
 
 
 def item_removed(removed):
-    message = []
-    example_list = list(removed)
+    messages = []
 
-    pattern = r"\['(.+?)'\]\['(.+?)'\]"
-    match = re.search(pattern, example_list[0])
+    for item in removed:
+        result = remove_constant_from_str(item)
+        messages.append("{}\n".format(result))
 
-    if match:
-        path_key = match.group(1)
-        method_key = match.group(2)
-        #print(path_key)  # '/applications/settings'
-        #print(method_key)  # 'put'
 
-    #print(type(removed))  # '/applications/settings'  <class 'deepdiff.model.PrettyOrderedSet'
-    #print(method_key)  # 'put'
+    return "\n\n".join(messages)
 
-    return message
+
+def remove_constant_from_str(input_str):
+    for constant in PATHS_CONSTANTS:
+        if constant in input_str:
+            input_str = input_str.replace(constant, "")
+    return input_str
 
 
 def check_required(is_required):

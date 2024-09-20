@@ -1,4 +1,4 @@
 PATHS_CONSTANTS = [
     "root['paths']",
-    "root['components']"
+    "root['components']['schemas']"
 ]

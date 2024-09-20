@@ -21,6 +21,16 @@ def welcome_block():
     }
 
 
+def new_title_block():
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": ":arrows_counterclockwise: *What's new?*"
+        }
+    }
+
+
 def change_title_block():
     return {
         "type": "section",

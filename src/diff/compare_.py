@@ -14,6 +14,7 @@ def compareto(api_url, newjson):
         added = diff.get('dictionary_item_added', [])
 
         if added:
+            diff_messages.append(templates.new_title_block())
             diff_messages = item_added(added, newjson)
 
         changed = diff.get('values_changed')
@@ -38,10 +39,16 @@ def compareto(api_url, newjson):
 
         iterable_added = diff.get('iterable_item_added')
         if iterable_added:
-            print(iterable_added)
+            iterable_added_messages = item_removed(iterable_added)
+            if iterable_added_messages:
+                if len(diff_messages) > 0 :
+                    diff_messages.append(templates.divider_block())
+                diff_messages.append(templates.markdown_block(iterable_added_messages))
+
 
     if diff_messages:
         diff_messages.insert(0, templates.header_block())
+        diff_messages.insert(1, templates.welcome_block())
 
     return diff_messages
 
@@ -50,7 +57,6 @@ def compareto(api_url, newjson):
 def item_added(added, newjson):
     message = []
     paths_values = [item.split("root['paths']")[1].strip("[]'") for item in added if "root['paths']" in item]
-    message.append(templates.welcome_block())
     for value in paths_values:
         swagger_data = newjson.get('paths').get(value)
         message.append(templates.divider_block())
@@ -86,12 +92,12 @@ def item_changed(values_changed):
     return "\n\n".join(messages)
 
 
-def item_removed(removed):
+def item_removed(items):
     messages = []
 
-    for item in removed:
+    for item in items:
         result = remove_constant_from_str(item)
-        messages.append("{}\n".format(result))
+        messages.append("{}".format(result))
 
     return "\n\n".join(messages)
 

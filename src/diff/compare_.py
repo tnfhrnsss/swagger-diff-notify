@@ -21,7 +21,7 @@ def compareto(api_url, newjson):
             change_format_m = item_changed(changed)
             if change_format_m:
                 if len(diff_messages) > 0 :
-                    diff_messages = templates.divider_block()
+                    diff_messages.append(templates.divider_block())
 
                 diff_messages.append(templates.change_title_block())
                 diff_messages.append(templates.markdown_block(change_format_m))
@@ -31,11 +31,10 @@ def compareto(api_url, newjson):
             removed_messages = item_removed(removed)
             if removed_messages:
                 if len(diff_messages) > 0 :
-                    diff_messages = templates.divider_block()
+                    diff_messages.append(templates.divider_block())
 
                 diff_messages.append(templates.remove_title_block())
                 diff_messages.append(templates.markdown_block(removed_messages))
-
 
         iterable_added = diff.get('iterable_item_added')
         if iterable_added:
@@ -93,7 +92,6 @@ def item_removed(removed):
     for item in removed:
         result = remove_constant_from_str(item)
         messages.append("{}\n".format(result))
-
 
     return "\n\n".join(messages)
 

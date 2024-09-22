@@ -14,8 +14,10 @@ def compareto(api_url, newjson):
         added = diff.get('dictionary_item_added', [])
 
         if added:
-            diff_messages.append(templates.new_title_block())
-            diff_messages = item_added(added, newjson)
+            item_added_result = item_added(added, newjson)
+            if len(item_added_result) > 0:
+                item_added_result.insert(0, templates.new_title_block())
+                diff_messages = item_added_result
 
         changed = diff.get('values_changed')
         if changed:
@@ -37,15 +39,6 @@ def compareto(api_url, newjson):
                 diff_messages.append(templates.remove_title_block())
                 diff_messages.append(templates.markdown_block(removed_messages))
 
-        iterable_added = diff.get('iterable_item_added')
-        if iterable_added:
-            iterable_added_messages = item_removed(iterable_added)
-            if iterable_added_messages:
-                if len(diff_messages) > 0 :
-                    diff_messages.append(templates.divider_block())
-                diff_messages.append(templates.markdown_block(iterable_added_messages))
-
-
     if diff_messages:
         diff_messages.insert(0, templates.header_block())
         diff_messages.insert(1, templates.welcome_block())
@@ -54,38 +47,30 @@ def compareto(api_url, newjson):
 
 
 
-def item_added(added, newjson):
-    message = []
+def item_added(added, raw_data):
+    messages = []
     paths_values = [item.split("root['paths']")[1].strip("[]'") for item in added if "root['paths']" in item]
     for value in paths_values:
-        swagger_data = newjson.get('paths').get(value)
-        message.append(templates.divider_block())
-        message.append(templates.api_path_block(value))
-        for endpoint, methods in swagger_data.items():
-            message.append(templates.api_method_block(endpoint))
-            message.append(create_slack_message(methods, newjson))
-    return message
+        swagger_data = raw_data.get('paths').get(value)
+        messages.append(templates.divider_block())
+        messages.append(templates.api_path_block(value))
+        for endpoint, method in swagger_data.items():
+            messages.append(templates.api_method_block(endpoint))
+            wrapped_detils = item_added_details(method, raw_data)
+            if len(wrapped_detils) > 0:
+                messages.append(templates.markdown_block(wrapped_detils))
+    return messages
 
 
 def item_changed(values_changed):
     messages = []
 
     for path, changes in values_changed.items():
-        if "root['servers']" in path or "root['paths']" in path:
+        if "root['paths']" in path:
+            extract_path = extract_first_two_brackets(path)
+            message = ">{}\n".format(extract_path)
+        else:
             continue
-
-        matched = re.search(r"\['schemas'\]\['(.*?)'\]", path)
-        changed_key = path
-        if matched:
-            changed_key = matched.group(1)
-
-        old_value = changes.get("old_value", {})
-        new_value = changes.get("new_value", {})
-
-        message = ">*{}*\n".format(changed_key)
-
-        for key in old_value.keys() | new_value.keys():
-            message += "* {} \n\n".format(key)
 
         messages.append(message)
 
@@ -102,6 +87,16 @@ def item_removed(items):
     return "\n\n".join(messages)
 
 
+def extract_first_two_brackets(input_str):
+    matches = re.findall(r"\['(.*?)'\]", input_str)
+
+    if len(matches) >= 3:
+        return "*({})* {}".format(matches[2], matches[1])
+    else:
+        return None
+
+
+
 def remove_constant_from_str(input_str):
     for constant in PATHS_CONSTANTS:
         if constant in input_str:
@@ -113,14 +108,13 @@ def check_required(is_required):
     return "(Required)" if is_required else ""
 
 
-def create_slack_message(methods, newjson):
+def item_added_details(method, raw_data):
     table = ""
-
-    for method, details in methods.items():
-        if method == 'operationId' or method == 'tags':
+    for key, details in method.items():
+        if key == 'operationId' or key == 'tags':
             continue
 
-        if method == 'parameters':
+        if key == 'parameters':
             header_params = []
             path_params = []
             query_params = []
@@ -148,28 +142,28 @@ def create_slack_message(methods, newjson):
 
 
         scheme_message = ''
-        if method == 'requestBody':
+        if key == 'requestBody':
             ref_path = details['content']['application/json']['schema']['$ref']
 
             path = ref_path.lstrip('#').split('/')
-            sms_push_template_cdo = get_value_from_path(newjson, path)
+            sms_push_template_cdo = get_value_from_path(raw_data, path)
             scheme_message = format_schema(sms_push_template_cdo)
             table += scheme_message
 
-        if method == 'responses':
+        if key == 'responses':
             try:
                 ref_path = details['200']['content']['*/*']['schema']['$ref']
                 path = ref_path.lstrip('#').split('/')
 
 
-                sms_push_template_cdo = get_value_from_path(newjson, path)
+                sms_push_template_cdo = get_value_from_path(raw_data, path)
                 scheme_message = response_format_schema(sms_push_template_cdo)
                 table += scheme_message
             except KeyError as e:
                 print(e)
 
 
-    return templates.markdown_block(table)
+    return table
 
 
 def get_value_from_path(data, path):

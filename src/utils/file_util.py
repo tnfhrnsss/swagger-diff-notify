@@ -2,13 +2,16 @@ import json
 
 from utils.datetime_util import get_current_datetime
 from utils.url_parser_util import extract_domain_port
+from config.config_loader import config
 
 
 def save_diff(diff):
-    current_time = get_current_datetime()
-    diff_file_name = "../output/{}_diff_result.json".format(current_time)
-    with open(diff_file_name, 'w') as file:
-        json.dump(diff, file, indent=4)
+    have_to_save = config.get('file_to_save_result')
+    if have_to_save:
+        current_time = get_current_datetime()
+        diff_file_name = "../output/{}_diff_result.json".format(current_time)
+        with open(diff_file_name, 'w') as file:
+            json.dump(diff, file, indent=4)
 
 
 def save_snapshot(prefix, data):

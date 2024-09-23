@@ -40,7 +40,7 @@ def compareto(api_url, newjson):
                 diff_messages.append(templates.markdown_block(removed_messages))
 
     if diff_messages:
-        diff_messages.insert(0, templates.header_block())
+        diff_messages.insert(0, templates.header_block(api_url))
         diff_messages.insert(1, templates.welcome_block())
 
     return diff_messages

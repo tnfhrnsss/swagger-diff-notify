@@ -1,12 +1,12 @@
 from utils.message_util import get_message
 
 
-def header_block():
+def header_block(api):
     return {
         "type": "header",
         "text": {
             "type": "plain_text",
-            "text": get_message("header")
+            "text": "{} \n\n".format(api) + get_message("header")
         }
     }
 

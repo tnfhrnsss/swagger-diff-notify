@@ -4,7 +4,7 @@ from utils import file_util
 import re
 from constants import PATHS_CONSTANTS
 
-def compareto(api_url, newjson):
+def diff(api_url, newjson):
     swagger_old = file_util.find_latest_snapshot(api_url)
     diff = DeepDiff(swagger_old, newjson, ignore_order=True)
 
